@@ -2,14 +2,6 @@
 
 Wenn S-Bahn oder Bus ausfallen: per Klapprad zur nächsten brauchbaren Haltestelle, Verbindungen ab dort in Echtzeit, sortiert nach frühester Ankunft. Läuft komplett im Browser, keine Server, keine Keys.
 
-## In 2 Minuten live
-
-1. Im Repo **plan-f** auf **Add file → Upload files** gehen.
-2. `index.html` und diese `README.md` hochladen, committen.
-3. **Settings → Pages**: unter "Build and deployment" als Source **Deploy from a branch** wählen, Branch **main**, Ordner **/ (root)**, speichern.
-4. Nach ca. 1 Minute ist die App erreichbar unter:
-   `https://DEIN-USERNAME.github.io/plan-f/`
-
 ## Aufs Handy holen
 
 Die URL in Safari oder Chrome öffnen, dann "Zum Home-Bildschirm hinzufügen". Beim ersten GPS-Klick die Standortfreigabe erlauben.
