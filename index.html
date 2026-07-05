@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Plan F – Ausweichrouten mit Rad + VBB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1219;
+    --surface:#171E2B;
+    --surface2:#1F2838;
+    --line:#2B3648;
+    --text:#EAEEF5;
+    --muted:#8B96A8;
+    --amber:#FFB300;
+    --amber-dim:#C98D00;
+    --bike:#FFB300;
+    --s:#008D4F; --u:#115D91; --tram:#BE1414; --bus:#A5027D;
+    --re:#E30613; --ferry:#0080BA; --warn:#FF6B4A;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans',system-ui,sans-serif;
+    font-size:15px;
+    line-height:1.45;
+    padding-bottom:60px;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px}
+
+  header{padding:26px 0 18px;border-bottom:1px solid var(--line)}
+  .brand{
+    font-family:'Overpass',sans-serif;
+    font-weight:800;
+    font-size:30px;
+    letter-spacing:-0.5px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .brand .f{
+    background:var(--amber);color:#0E1219;
+    width:38px;height:38px;border-radius:8px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:24px;flex:none;
+  }
+  .claim{color:var(--muted);font-size:13.5px;margin-top:6px}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-top:16px}
+  label.fld{display:block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .inputrow{display:flex;gap:8px}
+  input[type=text]{
+    flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;
+    color:var(--text);font:inherit;padding:11px 12px;min-width:0;
+  }
+  input[type=text]:focus{outline:2px solid var(--amber);outline-offset:1px;border-color:transparent}
+  .btn{
+    background:var(--surface2);border:1px solid var(--line);border-radius:10px;
+    color:var(--text);font:inherit;font-weight:600;padding:11px 14px;cursor:pointer;flex:none;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--amber);color:#0E1219;border-color:var(--amber);width:100%;font-family:'Overpass',sans-serif;font-weight:800;font-size:17px;padding:14px;margin-top:16px}
+  .btn.primary:disabled{opacity:.45;cursor:default}
+
+  .suggest{position:relative}
+  .sugbox{
+    position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;
+    background:var(--surface2);border:1px solid var(--line);border-radius:10px;
+    overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.5);
+  }
+  .sugbox button{
+    display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);
+    color:var(--text);font:inherit;padding:11px 12px;cursor:pointer;
+  }
+  .sugbox button:last-child{border-bottom:0}
+  .sugbox button:hover,.sugbox button:focus{background:rgba(255,179,0,.1)}
+  .sugbox small{display:block;color:var(--muted);font-size:12px}
+
+  .chipset{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    border:1px solid var(--line);background:var(--bg);color:var(--muted);
+    border-radius:999px;padding:7px 13px;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;
+  }
+  .chip.on{border-color:var(--amber);color:var(--amber);background:rgba(255,179,0,.08)}
+
+  .slider-row{display:flex;align-items:center;gap:12px}
+  input[type=range]{flex:1;accent-color:var(--amber)}
+  .slider-val{
+    font-family:'Overpass',sans-serif;font-weight:800;font-size:17px;color:var(--amber);
+    min-width:64px;text-align:right;font-variant-numeric:tabular-nums;
+  }
+  .gap{margin-top:16px}
+
+  .setpill{color:var(--muted);font-size:13px;margin-top:6px;min-height:18px}
+  .setpill.ok{color:var(--text)}
+
+  /* Status / Board */
+  .board-note{
+    font-family:'Overpass',sans-serif;color:var(--amber);font-weight:600;
+    padding:18px 4px;font-variant-numeric:tabular-nums;
+  }
+  .board-note.err{color:var(--warn)}
+  .blink{animation:blink 1.1s steps(2,start) infinite}
+  @keyframes blink{to{visibility:hidden}}
+  @media (prefers-reduced-motion:reduce){.blink{animation:none}}
+
+  /* Result cards */
+  .results{margin-top:8px}
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    margin-top:14px;overflow:hidden;
+  }
+  .card.best{border-color:var(--amber-dim)}
+  .card-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:13px 16px;border-bottom:1px solid var(--line);gap:10px;
+  }
+  .card-head .via{font-weight:600;font-size:14.5px;min-width:0}
+  .card-head .via small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
+  .arr{
+    font-family:'Overpass',sans-serif;font-weight:800;font-size:24px;color:var(--amber);
+    font-variant-numeric:tabular-nums;line-height:1;text-align:right;flex:none;
+  }
+  .arr small{display:block;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.05em}
+
+  .legs{padding:6px 16px 14px;position:relative}
+  .leg{display:flex;gap:12px;padding:8px 0;position:relative}
+  .leg .rail{width:26px;flex:none;display:flex;flex-direction:column;align-items:center}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none;margin-top:5px}
+  .leg .stem{width:3px;flex:1;background:var(--line);margin-top:3px;border-radius:2px}
+  .leg:last-child .stem{display:none}
+  .leg .body{flex:1;min-width:0}
+  .leg .t{
+    font-family:'Overpass',sans-serif;font-weight:600;color:var(--amber);
+    font-variant-numeric:tabular-nums;font-size:14px;
+  }
+  .leg .t .cancel{color:var(--warn);text-decoration:line-through}
+  .leg .desc{font-size:14px}
+  .leg .desc .to{color:var(--muted)}
+  .badge{
+    display:inline-block;font-family:'Overpass',sans-serif;font-weight:800;font-size:13px;
+    padding:2px 8px;border-radius:6px;color:#fff;margin-right:7px;vertical-align:1px;
+  }
+  .badge.bike{background:var(--bike);color:#0E1219}
+  .leg.bike .dot{background:var(--bike)}
+  .leg.bike .stem{background:repeating-linear-gradient(to bottom,var(--bike) 0 5px,transparent 5px 10px)}
+  .maplink{color:var(--amber);font-size:13px;text-decoration:none;border-bottom:1px dotted var(--amber-dim)}
+  .warnline{color:var(--warn);font-size:12.5px;margin-top:3px}
+  .card-foot{
+    display:flex;gap:14px;padding:10px 16px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;
+  }
+  .card-foot b{color:var(--text)}
+  footer{color:var(--muted);font-size:12px;padding:26px 4px 10px;line-height:1.6}
+  a{color:var(--amber)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand"><span class="f">F</span> Plan F</div>
+    <div class="claim">S-Bahn weg, Bus weg? Rad zur nächsten brauchbaren Haltestelle. Echtzeitdaten vom VBB.</div>
+  </header>
+
+  <!-- START -->
+  <div class="panel">
+    <label class="fld">Start</label>
+    <div class="inputrow suggest">
+      <input type="text" id="startInput" placeholder="Adresse oder Haltestelle" autocomplete="off">
+      <button class="btn" id="geoBtn" title="Eigenen Standort verwenden">📍</button>
+      <div class="sugbox" id="startSug" hidden></div>
+    </div>
+    <div class="setpill" id="startSet">Kein Start gewählt</div>
+
+    <label class="fld gap">Ziel</label>
+    <div class="inputrow suggest">
+      <input type="text" id="destInput" placeholder="Wohin willst du?" autocomplete="off">
+      <div class="sugbox" id="destSug" hidden></div>
+    </div>
+    <div class="setpill" id="destSet">Kein Ziel gewählt</div>
+  </div>
+
+  <!-- OPTIONEN -->
+  <div class="panel">
+    <label class="fld">Radradius zur Ausweichhaltestelle</label>
+    <div class="slider-row">
+      <input type="range" id="radius" min="1" max="8" step="0.5" value="4">
+      <span class="slider-val" id="radiusVal">4,0 km</span>
+    </div>
+
+    <label class="fld gap">Radtempo</label>
+    <div class="slider-row">
+      <input type="range" id="speed" min="10" max="24" step="1" value="16">
+      <span class="slider-val" id="speedVal">16 km/h</span>
+    </div>
+
+    <label class="fld gap">Diese Haltestellen zählen als Ausweichoption</label>
+    <div class="chipset" id="products">
+      <button class="chip on" data-p="suburban">S-Bahn</button>
+      <button class="chip on" data-p="subway">U-Bahn</button>
+      <button class="chip on" data-p="regional">RE/RB</button>
+      <button class="chip" data-p="tram">Tram</button>
+      <button class="chip" data-p="bus">Bus</button>
+      <button class="chip" data-p="ferry">Fähre</button>
+    </div>
+
+    <label class="fld gap">Linien meiden (ausgefallen, gestört)</label>
+    <input type="text" id="avoid" placeholder="z.B. S1, RE7, M85 (Komma-getrennt)" autocomplete="off">
+
+    <button class="btn primary" id="go" disabled>Ausweichrouten suchen</button>
+  </div>
+
+  <div class="board-note" id="status" hidden></div>
+  <div class="results" id="results"></div>
+
+  <footer>
+    Datenquellen: VBB-HAFAS über v6.vbb.transport.rest (Echtzeit, ohne Gewähr). Radzeiten sind Schätzungen über Luftlinie mal Umwegfaktor 1,35. Abfahrten werden ab dem Zeitpunkt gesucht, zu dem du die Haltestelle per Rad realistisch erreichst.
+  </footer>
+</div>
+
+<script>
+(() => {
+  const API = 'https://v6.vbb.transport.rest';
+  const $ = id => document.getElementById(id);
+
+  const state = {
+    start: null,   // {lat, lon, name}
+    dest: null,    // {lat, lon, name, id?, isStop}
+    products: new Set(['suburban','subway','regional']),
+  };
+
+  /* ---------- helpers ---------- */
+  const fmtTime = d => d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  function haversine(a, b){
+    const R = 6371000, rad = x => x*Math.PI/180;
+    const dLat = rad(b.lat-a.lat), dLon = rad(b.lon-a.lon);
+    const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(h));
+  }
+
+  function productBadge(line){
+    const map = {suburban:'s', subway:'u', tram:'tram', bus:'bus', regional:'re', express:'re', ferry:'ferry'};
+    const cls = map[line?.product] || 'bus';
+    return `<span class="badge" style="background:var(--${cls})">${esc(line?.name || '?')}</span>`;
+  }
+
+  function setStatus(msg, err=false, blink=false){
+    const el = $('status');
+    if(!msg){ el.hidden = true; return; }
+    el.hidden = false;
+    el.className = 'board-note' + (err ? ' err' : '');
+    el.innerHTML = esc(msg) + (blink ? ' <span class="blink">▮</span>' : '');
+  }
+
+  /* ---------- location search (autocomplete) ---------- */
+  function wireSearch(inputId, boxId, onPick){
+    const input = $(inputId), box = $(boxId);
+    let timer = null;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if(q.length < 3){ box.hidden = true; return; }
+      timer = setTimeout(async () => {
+        try{
+          const r = await fetch(`${API}/locations?query=${encodeURIComponent(q)}&results=6&poi=false`);
+          const list = await r.json();
+          if(!Array.isArray(list) || !list.length){ box.hidden = true; return; }
+          box.innerHTML = '';
+          list.forEach(loc => {
+            const isStop = loc.type === 'stop' || loc.type === 'station';
+            const lat = loc.latitude ?? loc.location?.latitude;
+            const lon = loc.longitude ?? loc.location?.longitude;
+            if(lat == null) return;
+            const b = document.createElement('button');
+            b.innerHTML = `${esc(loc.name)}<small>${isStop ? 'Haltestelle' : 'Adresse'}</small>`;
+            b.onclick = () => {
+              onPick({lat, lon, name: loc.name, id: isStop ? loc.id : null, isStop});
+              input.value = loc.name;
+              box.hidden = true;
+            };
+            box.appendChild(b);
+          });
+          box.hidden = !box.children.length;
+        }catch(e){ box.hidden = true; }
+      }, 300);
+    });
+    document.addEventListener('click', e => {
+      if(!box.contains(e.target) && e.target !== input) box.hidden = true;
+    });
+  }
+
+  function refreshReady(){
+    $('go').disabled = !(state.start && state.dest);
+  }
+
+  wireSearch('startInput','startSug', loc => {
+    state.start = loc;
+    $('startSet').textContent = 'Start: ' + loc.name;
+    $('startSet').className = 'setpill ok';
+    refreshReady();
+  });
+  wireSearch('destInput','destSug', loc => {
+    state.dest = loc;
+    $('destSet').textContent = 'Ziel: ' + loc.name;
+    $('destSet').className = 'setpill ok';
+    refreshReady();
+  });
+
+  $('geoBtn').onclick = () => {
+    if(!navigator.geolocation){ $('startSet').textContent = 'Standortdienst nicht verfügbar. Adresse eingeben.'; return; }
+    $('startSet').textContent = 'Standort wird ermittelt …';
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        state.start = {lat: pos.coords.latitude, lon: pos.coords.longitude, name: 'Mein Standort'};
+        $('startInput').value = 'Mein Standort';
+        $('startSet').textContent = 'Start: aktueller Standort';
+        $('startSet').className = 'setpill ok';
+        refreshReady();
+      },
+      () => { $('startSet').textContent = 'Standort abgelehnt. Adresse eingeben.'; },
+      {enableHighAccuracy:true, timeout:10000}
+    );
+  };
+
+  /* ---------- options ---------- */
+  $('radius').oninput = e => $('radiusVal').textContent = String(e.target.value).replace('.',',') + ' km';
+  $('speed').oninput  = e => $('speedVal').textContent  = e.target.value + ' km/h';
+  $('products').addEventListener('click', e => {
+    const chip = e.target.closest('.chip'); if(!chip) return;
+    const p = chip.dataset.p;
+    chip.classList.toggle('on');
+    chip.classList.contains('on') ? state.products.add(p) : state.products.delete(p);
+  });
+
+  /* ---------- core search ---------- */
+  $('go').onclick = runSearch;
+
+  async function runSearch(){
+    const results = $('results');
+    results.innerHTML = '';
+    if(!state.products.size){ setStatus('Wähle mindestens eine Haltestellen-Art.', true); return; }
+
+    const radiusM = parseFloat($('radius').value) * 1000;
+    const speed = parseFloat($('speed').value);
+    const avoid = $('avoid').value.split(',').map(s => s.trim().toUpperCase().replace(/\s+/g,'')).filter(Boolean);
+
+    setStatus('Haltestellen im Radius werden gesucht', false, true);
+
+    let stops;
+    try{
+      const r = await fetch(`${API}/locations/nearby?latitude=${state.start.lat}&longitude=${state.start.lon}&results=60&distance=${Math.round(radiusM)}&linesOfStops=false`);
+      stops = await r.json();
+    }catch(e){
+      setStatus('VBB-API nicht erreichbar. Netz prüfen und erneut versuchen.', true);
+      return;
+    }
+    if(!Array.isArray(stops)) stops = [];
+
+    // Kandidaten: passendes Produkt, echte Distanz im Radius, dedupliziert
+    const seen = new Set();
+    const candidates = stops
+      .filter(s => (s.type === 'stop' || s.type === 'station') && s.products)
+      .filter(s => [...state.products].some(p => s.products[p]))
+      .map(s => {
+        const lat = s.latitude ?? s.location?.latitude;
+        const lon = s.longitude ?? s.location?.longitude;
+        return {...s, lat, lon, dist: haversine(state.start, {lat, lon})};
+      })
+      .filter(s => s.lat != null && s.dist <= radiusM)
+      .sort((a,b) => a.dist - b.dist)
+      .filter(s => { const k = s.name; if(seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, 10);
+
+    if(!candidates.length){
+      setStatus('Keine passende Haltestelle im Radius. Radius vergrößern oder mehr Haltestellen-Arten zulassen.', true);
+      return;
+    }
+
+    setStatus(`${candidates.length} Ausweichhaltestellen. Verbindungen werden geprüft`, false, true);
+
+    const now = Date.now();
+    const jobs = candidates.map(async stop => {
+      const bikeMin = Math.max(2, Math.round((stop.dist * 1.35) / 1000 / speed * 60));
+      const dep = new Date(now + bikeMin * 60000).toISOString();
+      let url = `${API}/journeys?from=${encodeURIComponent(stop.id)}&results=2&remarks=true&departure=${encodeURIComponent(dep)}`;
+      url += state.dest.isStop && state.dest.id
+        ? `&to=${encodeURIComponent(state.dest.id)}`
+        : `&to.latitude=${state.dest.lat}&to.longitude=${state.dest.lon}&to.address=${encodeURIComponent(state.dest.name)}`;
+      const r = await fetch(url);
+      if(!r.ok) throw new Error('journeys ' + r.status);
+      const data = await r.json();
+      return (data.journeys || []).map(j => ({stop, bikeMin, journey: j}));
+    });
+
+    const settled = await Promise.allSettled(jobs);
+    let options = settled.filter(s => s.status === 'fulfilled').flatMap(s => s.value);
+
+    // Ausgefallene und gemiedene Linien raus
+    options = options.filter(o => {
+      const legs = o.journey.legs || [];
+      if(legs.some(l => l.cancelled)) return false;
+      if(avoid.length && legs.some(l => {
+        const n = (l.line?.name || '').toUpperCase().replace(/\s+/g,'');
+        return n && avoid.includes(n);
+      })) return false;
+      return true;
+    });
+
+    // Bewerten: früheste Ankunft gewinnt
+    options.forEach(o => {
+      const legs = o.journey.legs || [];
+      const last = legs[legs.length - 1];
+      o.arrival = new Date(last?.arrival || last?.plannedArrival || 0);
+      o.totalMin = Math.round((o.arrival - now) / 60000);
+    });
+    options = options
+      .filter(o => o.arrival.getTime() > now)
+      .sort((a,b) => a.arrival - b.arrival);
+
+    // Doppelte Verbindungen (gleiche Linienfolge + Ankunft) zusammenfassen
+    const sig = new Set();
+    options = options.filter(o => {
+      const k = o.stop.name + '|' + (o.journey.legs||[]).map(l => l.line?.name || 'W').join('>') + '|' + o.arrival.getTime();
+      if(sig.has(k)) return false; sig.add(k); return true;
+    }).slice(0, 8);
+
+    if(!options.length){
+      setStatus('Keine fahrbare Verbindung gefunden. Radius vergrößern oder gemiedene Linien prüfen.', true);
+      return;
+    }
+
+    setStatus(`${options.length} Optionen, sortiert nach Ankunft. Stand ${fmtTime(new Date())} Uhr.`);
+    results.innerHTML = options.map((o,i) => renderCard(o, i===0)).join('');
+  }
+
+  function renderCard(o, best){
+    const legs = (o.journey.legs || []).filter(l => l.line || !l.walking || (l.distance||0) > 250);
+    const dep = new Date(Date.now());
+    const bikeArr = new Date(dep.getTime() + o.bikeMin * 60000);
+    const maps = `https://www.google.com/maps/dir/?api=1&origin=${state.start.lat},${state.start.lon}&destination=${o.stop.lat},${o.stop.lon}&travelmode=bicycling`;
+
+    const bikeLeg = `
+      <div class="leg bike">
+        <div class="rail"><div class="dot"></div><div class="stem"></div></div>
+        <div class="body">
+          <div class="t">${fmtTime(dep)} – ca. ${fmtTime(bikeArr)}</div>
+          <div class="desc"><span class="badge bike">F</span>${o.bikeMin} min Rad <span class="to">→ ${esc(o.stop.name)}</span>
+            &nbsp;<a class="maplink" href="${maps}" target="_blank" rel="noopener">Radroute ↗</a>
+          </div>
+        </div>
+      </div>`;
+
+    const transitLegs = legs.map(l => {
+      const t1 = l.departure || l.plannedDeparture, t2 = l.arrival || l.plannedArrival;
+      const warns = (l.remarks || [])
+        .filter(r => r.type === 'warning' || r.type === 'status')
+        .slice(0,1)
+        .map(r => `<div class="warnline">⚠ ${esc((r.summary || r.text || '').slice(0,120))}</div>`).join('');
+      const delayed = l.departureDelay ? Math.round(l.departureDelay/60) : 0;
+      if(!l.line){
+        return `
+        <div class="leg">
+          <div class="rail"><div class="dot"></div><div class="stem"></div></div>
+          <div class="body"><div class="desc">🚶 Fußweg <span class="to">→ ${esc(l.destination?.name || '')}</span></div></div>
+        </div>`;
+      }
+      return `
+      <div class="leg">
+        <div class="rail"><div class="dot" style="background:var(--${({suburban:'s',subway:'u',tram:'tram',bus:'bus',regional:'re',express:'re',ferry:'ferry'})[l.line.product]||'bus'})"></div><div class="stem"></div></div>
+        <div class="body">
+          <div class="t">${t1 ? fmtTime(new Date(t1)) : '–'} – ${t2 ? fmtTime(new Date(t2)) : '–'}${delayed ? ` <span style="color:var(--warn)">+${delayed}</span>` : ''}</div>
+          <div class="desc">${productBadge(l.line)}${esc(l.direction || '')} <span class="to">→ ${esc(l.destination?.name || '')}</span></div>
+          ${warns}
+        </div>
+      </div>`;
+    }).join('');
+
+    return `
+    <div class="card${best ? ' best' : ''}">
+      <div class="card-head">
+        <div class="via">via ${esc(o.stop.name)}${best ? ' <small>Schnellste Option</small>' : `<small>${Math.round(o.stop.dist/100)/10} km Luftlinie</small>`}</div>
+        <div class="arr">${fmtTime(o.arrival)}<small>ANKUNFT</small></div>
+      </div>
+      <div class="legs">${bikeLeg}${transitLegs}</div>
+      <div class="card-foot">
+        <span>Gesamt <b>${o.totalMin} min</b></span>
+        <span>davon Rad <b>${o.bikeMin} min</b></span>
+        <span>Umstiege <b>${Math.max(0, legs.filter(l=>l.line).length - 1)}</b></span>
+      </div>
+    </div>`;
+  }
+})();
+</script>
+</body>
+</html>
