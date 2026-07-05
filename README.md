@@ -11,7 +11,7 @@ Die URL in Safari oder Chrome öffnen, dann "Zum Home-Bildschirm hinzufügen". B
 1. Start setzen (GPS-Button oder Adresse tippen), Ziel eingeben.
 2. Radradius und Radtempo einstellen.
 3. Wählen, was als Ausweichhaltestelle zählt (S-Bahn, U-Bahn, RE/RB, Tram, Bus, Fähre).
-4. Ausgefallene Linien ins Feld "Linien meiden" eintragen, z.B. `S1, RE7`.
+4. Ausgefallene Linien ins Feld "Linien meiden" eintragen, z.B. `S3, RE4`.
 5. Suchen. Die Karten zeigen Radetappe (mit Google-Maps-Radrouten-Link), alle ÖPNV-Etappen mit Echtzeit und Störungshinweisen, sortiert nach Ankunftszeit.
 
 ## Technik
