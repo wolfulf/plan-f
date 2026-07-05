@@ -272,40 +272,79 @@
       }
       box.hidden = false;
       box.innerHTML = '<div class="pickhint">Suche läuft …</div>';
-      try{
-        const r = await fetch(`${API}/locations?query=${encodeURIComponent(q)}&results=8&addresses=true&poi=true`);
-        const list = await r.json();
-        const items = (Array.isArray(list) ? list : []).map(loc => {
-          const isStop = loc.type === 'stop' || loc.type === 'station';
-          // Haltestellen tragen den Namen in .name, Adressen in .address, POIs in .poi.name
-          const label = loc.name || loc.address || loc.poi?.name;
+
+      // Zweigleisig: VBB kann Haltestellen, Photon (OpenStreetMap) kann Adressen.
+      // Standortnähe als Bias, Suchraum grob auf das VBB-Land begrenzt.
+      const bias = state.start
+        ? `&lat=${state.start.lat}&lon=${state.start.lon}`
+        : '&lat=52.52&lon=13.405';
+      const vbbUrl = `${API}/locations?query=${encodeURIComponent(q)}&results=5&addresses=false&poi=false`;
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=de${bias}&bbox=11.2,51.3,15.1,53.6`;
+
+      const [vbbRes, photonRes] = await Promise.allSettled([
+        fetch(vbbUrl).then(r => r.json()),
+        fetch(photonUrl).then(r => r.json())
+      ]);
+
+      const items = [];
+
+      // 1) Haltestellen (mit HAFAS-ID, beste Routingqualität)
+      if(vbbRes.status === 'fulfilled' && Array.isArray(vbbRes.value)){
+        vbbRes.value.forEach(loc => {
+          if(loc.type !== 'stop' && loc.type !== 'station') return;
           const lat = loc.latitude ?? loc.location?.latitude;
           const lon = loc.longitude ?? loc.location?.longitude;
-          if(lat == null || lon == null || !label) return null;
-          return {lat, lon, name: label, id: isStop ? loc.id : null, isStop,
-                  kind: isStop ? 'Haltestelle' : (loc.address ? 'Adresse' : 'Ort')};
-        }).filter(Boolean);
-
-        if(!items.length){
-          box.innerHTML = '<div class="pickhint">Nichts gefunden. Schreibweise prüfen, z.B. mit Ortsteil oder "Berlin".</div>';
-          return;
-        }
-        box.innerHTML = '';
-        items.forEach(it => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.innerHTML = `${esc(it.name)}<small>${it.kind}</small>`;
-          b.onclick = () => {
-            onPick(it);
-            input.value = it.name;
-            box.hidden = true;
-            box.innerHTML = '';
-          };
-          box.appendChild(b);
+          if(lat == null || lon == null || !loc.name) return;
+          items.push({lat, lon, name: loc.name, id: loc.id, isStop: true, kind: 'Haltestelle'});
         });
-      }catch(e){
-        box.innerHTML = '<div class="pickhint">VBB-Suche gerade nicht erreichbar. Nochmal auf 🔍 tippen.</div>';
       }
+
+      // 2) Adressen und Orte aus OpenStreetMap
+      if(photonRes.status === 'fulfilled' && Array.isArray(photonRes.value?.features)){
+        photonRes.value.features.forEach(f => {
+          const p = f.properties || {};
+          const [lon, lat] = f.geometry?.coordinates || [];
+          if(lat == null || lon == null) return;
+          const street = [p.street || (p.osm_key === 'highway' ? p.name : null), p.housenumber].filter(Boolean).join(' ');
+          const label = p.housenumber ? street : (p.name || street);
+          if(!label) return;
+          const sub = [p.postcode, p.city || p.district || p.county].filter(Boolean).join(' ');
+          items.push({lat, lon, name: sub ? `${label}, ${sub}` : label, id: null, isStop: false,
+                      kind: p.housenumber ? 'Adresse' : (p.osm_key === 'highway' ? 'Straße' : 'Ort'),
+                      display: label, subline: sub});
+        });
+      }
+
+      // Dubletten raus
+      const seen = new Set();
+      const unique = items.filter(it => {
+        const k = it.name.toLowerCase();
+        if(seen.has(k)) return false; seen.add(k); return true;
+      });
+
+      if(!unique.length){
+        const bothFailed = vbbRes.status === 'rejected' && photonRes.status === 'rejected';
+        box.innerHTML = bothFailed
+          ? '<div class="pickhint">Suchdienste gerade nicht erreichbar. Nochmal auf 🔍 tippen.</div>'
+          : '<div class="pickhint">Nichts gefunden. Anders formulieren, z.B. "Straße Hausnummer Ort".</div>';
+        return;
+      }
+
+      box.innerHTML = '';
+      unique.forEach(it => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        const title = it.display || it.name;
+        const sub = it.subline ? `${it.kind} · ${it.subline}` : it.kind;
+        b.innerHTML = `${esc(title)}<small>${esc(sub)}</small>`;
+        b.onclick = () => {
+          onPick(it);
+          input.value = it.name;
+          box.hidden = true;
+          box.innerHTML = '';
+        };
+        box.appendChild(b);
+      });
     }
 
     btn.addEventListener('click', search);
