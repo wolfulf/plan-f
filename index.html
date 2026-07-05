@@ -65,19 +65,18 @@
   .btn.primary{background:var(--amber);color:#0E1219;border-color:var(--amber);width:100%;font-family:'Overpass',sans-serif;font-weight:800;font-size:17px;padding:14px;margin-top:16px}
   .btn.primary:disabled{opacity:.45;cursor:default}
 
-  .suggest{position:relative}
-  .sugbox{
-    position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;
-    background:var(--surface2);border:1px solid var(--line);border-radius:10px;
-    overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.5);
+  .picklist{
+    margin-top:8px;background:var(--surface2);border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;
   }
-  .sugbox button{
+  .picklist button{
     display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);
-    color:var(--text);font:inherit;padding:11px 12px;cursor:pointer;
+    color:var(--text);font:inherit;padding:12px;cursor:pointer;
   }
-  .sugbox button:last-child{border-bottom:0}
-  .sugbox button:hover,.sugbox button:focus{background:rgba(255,179,0,.1)}
-  .sugbox small{display:block;color:var(--muted);font-size:12px}
+  .picklist button:last-child{border-bottom:0}
+  .picklist button:active{background:rgba(255,179,0,.12)}
+  .picklist small{display:block;color:var(--muted);font-size:12px}
+  .pickhint{padding:12px;color:var(--muted);font-size:13.5px}
 
   .chipset{display:flex;flex-wrap:wrap;gap:8px}
   .chip{
@@ -169,18 +168,20 @@
   <!-- START -->
   <div class="panel">
     <label class="fld">Start</label>
-    <div class="inputrow suggest">
-      <input type="text" id="startInput" placeholder="Adresse oder Haltestelle" autocomplete="off">
+    <div class="inputrow">
+      <input type="text" id="startInput" placeholder="Adresse oder Haltestelle" autocomplete="off" enterkeyhint="search">
+      <button class="btn" id="startSearchBtn" title="Suchen">🔍</button>
       <button class="btn" id="geoBtn" title="Eigenen Standort verwenden">📍</button>
-      <div class="sugbox" id="startSug" hidden></div>
     </div>
+    <div class="picklist" id="startSug" hidden></div>
     <div class="setpill" id="startSet">Kein Start gewählt</div>
 
     <label class="fld gap">Ziel</label>
-    <div class="inputrow suggest">
-      <input type="text" id="destInput" placeholder="Wohin willst du?" autocomplete="off">
-      <div class="sugbox" id="destSug" hidden></div>
+    <div class="inputrow">
+      <input type="text" id="destInput" placeholder="Wohin willst du?" autocomplete="off" enterkeyhint="search">
+      <button class="btn" id="destSearchBtn" title="Suchen">🔍</button>
     </div>
+    <div class="picklist" id="destSug" hidden></div>
     <div class="setpill" id="destSet">Kein Ziel gewählt</div>
   </div>
 
@@ -258,57 +259,58 @@
     el.innerHTML = esc(msg) + (blink ? ' <span class="blink">▮</span>' : '');
   }
 
-  /* ---------- location search (autocomplete) ---------- */
-  function wireSearch(inputId, boxId, onPick){
-    const input = $(inputId), box = $(boxId);
-    let timer = null;
-    let reqId = 0; // laufende Nummer, damit veraltete Antworten die Liste nicht überschreiben
+  /* ---------- location search (explizit per Button/Enter) ---------- */
+  function wireSearch(inputId, btnId, boxId, onPick){
+    const input = $(inputId), btn = $(btnId), box = $(boxId);
 
-    input.addEventListener('input', () => {
-      clearTimeout(timer);
+    async function search(){
       const q = input.value.trim();
-      if(q.length < 3){ reqId++; box.hidden = true; return; }
-      timer = setTimeout(async () => {
-        const myId = ++reqId;
-        try{
-          const r = await fetch(`${API}/locations?query=${encodeURIComponent(q)}&results=8&addresses=true&poi=true`);
-          const list = await r.json();
-          if(myId !== reqId) return; // inzwischen wurde weitergetippt: Antwort verwerfen
-          if(!Array.isArray(list) || !list.length){ box.hidden = true; return; }
-          box.innerHTML = '';
-          list.forEach(loc => {
-            const isStop = loc.type === 'stop' || loc.type === 'station';
-            // Haltestellen tragen den Namen in .name, Adressen in .address, POIs in .poi.name
-            const label = loc.name || loc.address || loc.poi?.name;
-            const lat = loc.latitude ?? loc.location?.latitude;
-            const lon = loc.longitude ?? loc.location?.longitude;
-            if(lat == null || lon == null || !label) return;
-            const kind = isStop ? 'Haltestelle' : (loc.address ? 'Adresse' : 'Ort');
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.innerHTML = `${esc(label)}<small>${kind}</small>`;
-            // pointerdown feuert VOR blur/Tastatur-Schließen: so greift die Auswahl
-            // auf iOS Safari zuverlässig, bevor die Seite sich verschiebt
-            const pick = e => {
-              e.preventDefault();
-              onPick({lat, lon, name: label, id: isStop ? loc.id : null, isStop});
-              input.value = label;
-              reqId++; // offene Anfragen entwerten
-              box.hidden = true;
-            };
-            b.addEventListener('pointerdown', pick);
-            b.addEventListener('click', e => e.preventDefault());
-            box.appendChild(b);
-          });
-          box.hidden = !box.children.length;
-        }catch(e){ if(myId === reqId) box.hidden = true; }
-      }, 300);
-    });
+      if(q.length < 2){
+        box.hidden = false;
+        box.innerHTML = '<div class="pickhint">Mindestens 2 Zeichen eingeben.</div>';
+        return;
+      }
+      box.hidden = false;
+      box.innerHTML = '<div class="pickhint">Suche läuft …</div>';
+      try{
+        const r = await fetch(`${API}/locations?query=${encodeURIComponent(q)}&results=8&addresses=true&poi=true`);
+        const list = await r.json();
+        const items = (Array.isArray(list) ? list : []).map(loc => {
+          const isStop = loc.type === 'stop' || loc.type === 'station';
+          // Haltestellen tragen den Namen in .name, Adressen in .address, POIs in .poi.name
+          const label = loc.name || loc.address || loc.poi?.name;
+          const lat = loc.latitude ?? loc.location?.latitude;
+          const lon = loc.longitude ?? loc.location?.longitude;
+          if(lat == null || lon == null || !label) return null;
+          return {lat, lon, name: label, id: isStop ? loc.id : null, isStop,
+                  kind: isStop ? 'Haltestelle' : (loc.address ? 'Adresse' : 'Ort')};
+        }).filter(Boolean);
 
-    // Schließen bei Tipp/Klick außerhalb, ebenfalls über pointerdown,
-    // damit die Reihenfolge zur Auswahl-Logik oben konsistent ist
-    document.addEventListener('pointerdown', e => {
-      if(!box.contains(e.target) && e.target !== input) box.hidden = true;
+        if(!items.length){
+          box.innerHTML = '<div class="pickhint">Nichts gefunden. Schreibweise prüfen, z.B. mit Ortsteil oder "Berlin".</div>';
+          return;
+        }
+        box.innerHTML = '';
+        items.forEach(it => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.innerHTML = `${esc(it.name)}<small>${it.kind}</small>`;
+          b.onclick = () => {
+            onPick(it);
+            input.value = it.name;
+            box.hidden = true;
+            box.innerHTML = '';
+          };
+          box.appendChild(b);
+        });
+      }catch(e){
+        box.innerHTML = '<div class="pickhint">VBB-Suche gerade nicht erreichbar. Nochmal auf 🔍 tippen.</div>';
+      }
+    }
+
+    btn.addEventListener('click', search);
+    input.addEventListener('keydown', e => {
+      if(e.key === 'Enter'){ e.preventDefault(); search(); }
     });
   }
 
@@ -316,13 +318,13 @@
     $('go').disabled = !(state.start && state.dest);
   }
 
-  wireSearch('startInput','startSug', loc => {
+  wireSearch('startInput','startSearchBtn','startSug', loc => {
     state.start = loc;
     $('startSet').textContent = 'Start: ' + loc.name;
     $('startSet').className = 'setpill ok';
     refreshReady();
   });
-  wireSearch('destInput','destSug', loc => {
+  wireSearch('destInput','destSearchBtn','destSug', loc => {
     state.dest = loc;
     $('destSet').textContent = 'Ziel: ' + loc.name;
     $('destSet').className = 'setpill ok';
