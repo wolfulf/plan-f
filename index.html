@@ -268,20 +268,23 @@
       if(q.length < 3){ box.hidden = true; return; }
       timer = setTimeout(async () => {
         try{
-          const r = await fetch(`${API}/locations?query=${encodeURIComponent(q)}&results=6&poi=false`);
+          const r = await fetch(`${API}/locations?query=${encodeURIComponent(q)}&results=8&addresses=true&poi=true`);
           const list = await r.json();
           if(!Array.isArray(list) || !list.length){ box.hidden = true; return; }
           box.innerHTML = '';
           list.forEach(loc => {
             const isStop = loc.type === 'stop' || loc.type === 'station';
+            // Haltestellen tragen den Namen in .name, Adressen in .address, POIs in .poi.name
+            const label = loc.name || loc.address || loc.poi?.name;
             const lat = loc.latitude ?? loc.location?.latitude;
             const lon = loc.longitude ?? loc.location?.longitude;
-            if(lat == null) return;
+            if(lat == null || lon == null || !label) return;
+            const kind = isStop ? 'Haltestelle' : (loc.address ? 'Adresse' : 'Ort');
             const b = document.createElement('button');
-            b.innerHTML = `${esc(loc.name)}<small>${isStop ? 'Haltestelle' : 'Adresse'}</small>`;
+            b.innerHTML = `${esc(label)}<small>${kind}</small>`;
             b.onclick = () => {
-              onPick({lat, lon, name: loc.name, id: isStop ? loc.id : null, isStop});
-              input.value = loc.name;
+              onPick({lat, lon, name: label, id: isStop ? loc.id : null, isStop});
+              input.value = label;
               box.hidden = true;
             };
             box.appendChild(b);
