@@ -262,14 +262,18 @@
   function wireSearch(inputId, boxId, onPick){
     const input = $(inputId), box = $(boxId);
     let timer = null;
+    let reqId = 0; // laufende Nummer, damit veraltete Antworten die Liste nicht überschreiben
+
     input.addEventListener('input', () => {
       clearTimeout(timer);
       const q = input.value.trim();
-      if(q.length < 3){ box.hidden = true; return; }
+      if(q.length < 3){ reqId++; box.hidden = true; return; }
       timer = setTimeout(async () => {
+        const myId = ++reqId;
         try{
           const r = await fetch(`${API}/locations?query=${encodeURIComponent(q)}&results=8&addresses=true&poi=true`);
           const list = await r.json();
+          if(myId !== reqId) return; // inzwischen wurde weitergetippt: Antwort verwerfen
           if(!Array.isArray(list) || !list.length){ box.hidden = true; return; }
           box.innerHTML = '';
           list.forEach(loc => {
@@ -281,19 +285,29 @@
             if(lat == null || lon == null || !label) return;
             const kind = isStop ? 'Haltestelle' : (loc.address ? 'Adresse' : 'Ort');
             const b = document.createElement('button');
+            b.type = 'button';
             b.innerHTML = `${esc(label)}<small>${kind}</small>`;
-            b.onclick = () => {
+            // pointerdown feuert VOR blur/Tastatur-Schließen: so greift die Auswahl
+            // auf iOS Safari zuverlässig, bevor die Seite sich verschiebt
+            const pick = e => {
+              e.preventDefault();
               onPick({lat, lon, name: label, id: isStop ? loc.id : null, isStop});
               input.value = label;
+              reqId++; // offene Anfragen entwerten
               box.hidden = true;
             };
+            b.addEventListener('pointerdown', pick);
+            b.addEventListener('click', e => e.preventDefault());
             box.appendChild(b);
           });
           box.hidden = !box.children.length;
-        }catch(e){ box.hidden = true; }
+        }catch(e){ if(myId === reqId) box.hidden = true; }
       }, 300);
     });
-    document.addEventListener('click', e => {
+
+    // Schließen bei Tipp/Klick außerhalb, ebenfalls über pointerdown,
+    // damit die Reihenfolge zur Auswahl-Logik oben konsistent ist
+    document.addEventListener('pointerdown', e => {
       if(!box.contains(e.target) && e.target !== input) box.hidden = true;
     });
   }
